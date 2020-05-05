@@ -163,8 +163,6 @@ id,label
 | Ernie-1.0          | 对词、实体及实体关系建模   | 1        | YES                  |
 | RoBERTa-large-pair | 面向相似性或句子对任务优化 | 1        | NO                   |
 
- 
-
 - 预测时：算数平均→几何平均→sigmoid平均（用反函数取出sigmoid/softmax归一化之前的状态做平均，信息量更大，提升明显）
 
 ![img](README.assets/clip_image001-1588664666725.png)
@@ -174,9 +172,9 @@ id,label
 - 分类阈值微调（0.47）
 - 伪标签
 
-![img](README.assets/clip_image002-1588664666726.png)![img](file:///C:/Users/hasee/AppData/Local/Packages/Microsoft.Office.OneNote_8wekyb3d8bbwe/TempState/msohtmlclip/clip_image003.png)
+![img](README.assets/clip_image002-1588664666726.png)
 
- 
+​							 ![](README.assets/clip_image003-1588666471287.png)
 
 
 
@@ -184,46 +182,38 @@ id,label
 
 - 数据增强：
 
-- - 外部数据增强：首先使用比赛中的原始数据构建筛选模型（采用roberta_large_pair模型)，后对chip2019的数据进行预测。筛选预测的概率处于(0.20~0.80)之间的数据作为外部增强数据
+  - 外部数据增强：首先使用比赛中的原始数据构建筛选模型（采用roberta_large_pair模型)，后对chip2019的数据进行预测。筛选预测的概率处于(0.20~0.80)之间的数据作为外部增强数据
   - 内部数据增强：传递性（保持数据平衡）、训练集8个类别，测试集10个类别，通过病名/药名的替换生成**缺失类别**的数据。
 
- 
-
 - 预训练模型选择：
+  - ERNIE
 
-- - ERNIE
+    在医疗数据中，往往会存在较多的实体概念；此外文本相似度作为问答任务的子任务，数据描述类型也偏向于口语。ERNIE是百度提出的知识增强的语义表示模型，通过对词、实体等语义单元的掩码，使模型学习完整概念的语义表示，其训练语料包括了百科类文章、新闻资讯、论坛对话。因此ERNIE能够更准确表达语句中实体的语义，且符合口语的情景。
 
-在医疗数据中，往往会存在较多的实体概念；此外文本相似度作为问答任务的子任务，数据描述类型也偏向于口语。ERNIE是百度提出的知识增强的语义表示模型，通过对词、实体等语义单元的掩码，使模型学习完整概念的语义表示，其训练语料包括了百科类文章、新闻资讯、论坛对话。因此ERNIE能够更准确表达语句中实体的语义，且符合口语的情景。
+  - Roberta_large
 
-- Roberta_large
+    Roberta_large是目前大多数NLP任务的SOTA模型。在Roberta_large中文版本使用了动态掩码、全词掩码，增加了训练数据，并改变了生成的方式和语言模型的任务。因此，在医疗文本上，Roberta_large能更好地对文本进行编码。
 
-Roberta_large是目前大多数NLP任务的SOTA模型。在Roberta_large中文版本使用了动态掩码、全词掩码，增加了训练数据，并改变了生成的方式和语言模型的任务。因此，在医疗文本上，Roberta_large能更好地对文本进行编码。
+  - Roberta_large_pair
 
-- Roberta_large_pair
-
-Roberta_large_pair是针对文本对任务提出的专门模型，能够较好地处理语义相似度或句子对问题。因此，在医疗文本相似度任务上，往往能够取得更好的结果。
+    Roberta_large_pair是针对文本对任务提出的专门模型，能够较好地处理语义相似度或句子对问题。因此，在医疗文本相似度任务上，往往能够取得更好的结果。
 
 - 模型训练
+  - Multi-sample-dropout
 
-- - Multi-sample-dropout
-
-在训练过程中，由于Bert后接了dropout层。为了加快模型的训练，我们使用multi-sample-dropout技术。通过对Bert后的dropout层进行多次sample，并对其多次输出的loss进行平均，增加了dropout层的稳定性，同时使得Bert后面的全连接层相较于前面的Bert_base部分能够得到更多的训练。
+    在训练过程中，由于Bert后接了dropout层。为了加快模型的训练，我们使用multi-sample-dropout技术。通过对Bert后的dropout层进行多次sample，并对其多次输出的loss进行平均，增加了dropout层的稳定性，同时使得Bert后面的全连接层相较于前面的Bert_base部分能够得到更多的训练。
 
 ![img](README.assets/clip_image004.png)
 
- 
+  - 数据交叉
 
-- 数据交叉
-
-通过数据交叉，即训练时使用不同的数据进行组合，能够在**数据层面**增加模型簇的多样性。这次比赛中，我们秉承的insight是：将难的数据集（外部数据）给更强大的模型，使小的模型能够精准预测，大的模型更具鲁棒性。 此外，也可以通过KL散度计算不同组合的模型的差异，并计算模型两两间的差异和，计算模型簇整体的多样性；以这样的形式，选取数据组合。
+    通过数据交叉，即训练时使用不同的数据进行组合，能够在数据层面增加模型簇的多样性。这次比赛中，我们秉承的insight是：将难的数据集（外部数据）给更强大的模型，使小的模型能够精准预测，大的模型更具鲁棒性。 此外，也可以通过KL散度计算不同组合的模型的差异，并计算模型两两间的差异和，计算模型簇整体的多样性；以这样的形式，选取数据组合。
 
 | **模型**           | **原始数据** | **增强数据（外部数据）** | **增强数据（传递性）** | **增强数据（新类别）** |
 | ------------------ | ------------ | ------------------------ | ---------------------- | ---------------------- |
 | ERNIE              | yes          | no                       | yes                    | yes                    |
 | Roberta_large_pair | yes          | yes                      | yes                    | yes                    |
 | Roberta_large      | yes          | yes                      | yes                    | no                     |
-
- 
 
 - 测试数据增强
 
@@ -237,9 +227,7 @@ Roberta_large_pair是针对文本对任务提出的专门模型，能够较好�
 
 ![img](README.assets/clip_image005.png)
 
- 
-
-1. 采用对抗训练
+2. 采用对抗训练
 
 | **query 1**            | **query 2**                  | **label(true)** | **label(fgm)** | **label(none)** |
 | ---------------------- | ---------------------------- | --------------- | -------------- | --------------- |
@@ -247,9 +235,7 @@ Roberta_large_pair是针对文本对任务提出的专门模型，能够较好�
 | 右下肺部感染是肺炎吗?  | 又下肺部感染是肺炎不是       | 1               | 1              | 0               |
 | 23价肺炎有必要打吗     | 23价肺炎有什么作用           | 0               | 0              | 1               |
 
- 
-
-1. 组间投票再投票的融合方式
+3. 组间投票再投票的融合方式
 
 ![img](README.assets/clip_image006.png)
 
@@ -259,19 +245,17 @@ Roberta_large_pair是针对文本对任务提出的专门模型，能够较好�
 
 RoBERTa-large，将最后一层的进行平均池化操作并与[cls]进行拼接。在训练时采用对抗训练（PGD）增强语义信息。
 
- 
+  `def forward(self, input_ids, input_masks, segment_ids):`
 
-  def forward(self, input_ids, input_masks, segment_ids):
+​         `sequence_output, pooler_output, hidden_states = self.bert_model(input_ids=input_ids,     token_type_ids=segment_ids,attention_mask=input_masks)`
 
-​    sequence_output, pooler_output, hidden_states = self.bert_model(input_ids=input_ids, token_type_ids=segment_ids,attention_mask=input_masks)
+​         `seq_avg = torch.mean(sequence_output, dim=1)`
 
-​    seq_avg = torch.mean(sequence_output, dim=1)
+​         `concat_out = torch.cat((seq_avg, pooler_output), dim=1)`
 
-​    concat_out = torch.cat((seq_avg, pooler_output), dim=1)
+​         `logit = self.classifier(concat_out)`
 
-​    logit = self.classifier(concat_out)
-
-​    return logit
+​         `return logit`
 
  
 
