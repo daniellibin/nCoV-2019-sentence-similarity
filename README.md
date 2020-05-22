@@ -241,21 +241,90 @@ id,label
 
  
 
-[**Rank4:**](<https://tianchi.aliyun.com/mas-notebook/preview/88964/04dcb040-78bf-11ea-9dd8-017940852515.ipynb/-1?lang=> )
+[**Rank4_1:**](<https://tianchi.aliyun.com/mas-notebook/preview/88964/04dcb040-78bf-11ea-9dd8-017940852515.ipynb/-1?lang=> )
 
 RoBERTa-large，将最后一层的进行平均池化操作并与[cls]进行拼接。在训练时采用对抗训练（PGD）增强语义信息。
 
-  `def forward(self, input_ids, input_masks, segment_ids):`
-
-​         `sequence_output, pooler_output, hidden_states = self.bert_model(input_ids=input_ids,     token_type_ids=segment_ids,attention_mask=input_masks)`
-
-​         `seq_avg = torch.mean(sequence_output, dim=1)`
-
-​         `concat_out = torch.cat((seq_avg, pooler_output), dim=1)`
-
-​         `logit = self.classifier(concat_out)`
-
-​         `return logit`
+```python
+def forward(self, input_ids, input_masks, segment_ids):`
+	sequence_output, pooler_output, hidden_states = self.bert_model(input_ids=input_ids,  token_type_ids=segment_ids,attention_mask=input_masks)`
+    seq_avg = torch.mean(sequence_output, dim=1)`
+    concat_out = torch.cat((seq_avg, pooler_output), dim=1)`
+    logit = self.classifier(concat_out)`
+    return logit
+```
 
  
 
+[Rank4_2](https://tianchi.aliyun.com/notebook-ai/detail?spm=5176.12586969.1002.36.5a2265fdwn5qpx&postId=100480)
+
+1.OOV病种数据增强
+
+在本次比赛中，我们需要模型学习哪些信息？我们如何让模型获得OOV病种的这些信息？ 在本解决方案中，认为模型需要学习以下四种信息：
+
+- 基本语义
+
+- 病名
+
+- 药名
+
+- 病理
+
+  
+
+  参照比赛难点中的第1点，我们可以通过某些方法来制作OOV病种样本的数据进行数据增强，参照第3点，我们需要小心翼翼的增强，以避免改变原数据中的重要分布，使得模型性能大幅度下跌
+
+  在本解决方案中，使用了外部先验医药知识，尽量避开病理来对已有标注数据进行病名的替换，整个替换的流程如下
+
+![img](README.assets/1585815057714_iISOKDRnTB.jpg)
+
+2.训练时-测试时交换增强
+
+ ![img](README.assets/1585814961283_E6mQker9SX.jpg)
+
+3.模型融合与伪标签
+
+本解决方案同样使用了一些数据比赛的常用方法：模型融合和伪标签
+
+- 模型融合
+  1. 使用多个模型的预测结果logits平均值再求argmax得到最终结果。
+  2. 模型的结构均为原模型接dropout层再接一个两节点全连接层，使用CrossEntropy作为loss，为正常的分类结构，没有在模型结构上做其他改动。
+- 伪标签 使用预测结果与原数据集拼接再做一次训练，用训练得到的模型对测试数据再次进行预测。
+
+
+
+[Rank6_1](https://tianchi.aliyun.com/notebook-ai/detail?spm=5176.12586969.1002.6.5a2265fdwn5qpx&postId=101635)
+
+- 数据增强 根据数据传递性数据增强
+  - 原始数据：句子A和句子B相似, 句子A和句子C相似, 句子A和句子D不相似
+  - 增强后数据：句子A和句子B相似, 句子A和句子C相似, 句子B和句子C相似, 句子A和句子D不相似,句子B和句子D不相似,句子C和句子D不相似
+
+- 预训练模型尝试
+  - [roberta-wwm-large](https://github.com/ymcui/Chinese-BERT-wwm) ~95.4
+  - [roberta-wwm-large](https://github.com/ymcui/Chinese-BERT-wwm) + fgm(5 ensemble) ~95.6
+  - [roberta_large_clue/roberta_large_pair](https://github.com/CLUEbenchmark/CLUECorpus2020) + fgm ~95.8
+  - [NEZHA/NEZHA-wwm](https://github.com/huawei-noah/Pretrained-Language-Model/tree/master/NEZHA)(5 ensemble) + fgm ~95.9
+  - [UER-py](https://github.com/dbiir/UER-py) + fgm ~96.00
+  - 融合(UER-py + NEZHA)(10 model) 96.26
+- 模型优化
+  - 特征融合（预训练模型 + 腾讯词向量 + fasttext词向量）
+    - 腾讯词向量(https://ai.tencent.com/ailab/nlp/embedding.html)
+    - fasttext词向量(https://fasttext.cc/)
+  - [对抗学习/FGM](https://kexue.fm/archives/7234)
+
+
+
+[Rank6_2](https://tianchi.aliyun.com/notebook-ai/detail?spm=5176.12586969.1002.15.5a2265fd21IhGt&postId=101648)
+
+有效的trick
+1.预训练模型的选择上，Roberta_wwm_large、UER线下实验效果最好
+-> https://github.com/ymcui/Chinese-BERT-wwm、https://github.com/dbiir/UER-py
+
+2.通过相似传递进行数据增强（正负采样：A-B相似、A-C相似 -> B-C相似）¶
+3.对抗训练，提升模型鲁棒性
+-> https://zhuanlan.zhihu.com/p/91269728
+
+4.Label-Smoothing 标签平滑（微小提升）
+5.加权融合（自定义search函数寻找最优的融合权重）
+6.自蒸馏(没有明显提升)
+7.实体替换增强(没有明显提升)
